@@ -9,11 +9,11 @@ function request_collections_json(collections)
         :id => k,
         :crs => [
             "http://www.opengis.net/def/crs/EPSG/0/4326",
-            v.dggsrs
+            v.dggs_pyramid.dggsrs
         ],
         :extent => Dict(
             :spatial => Dict(
-                :bbox => [v.bbox |> x -> [x.X[1], x.Y[1], x.X[2], x.Y[2]]]
+                :bbox => [v.dggs_pyramid.bbox |> x -> [x.X[1], x.Y[1], x.X[2], x.Y[2]]]
             )
         )
     ) for (k, v) in collections]
@@ -53,7 +53,7 @@ function request_collection(req, collectionId, collections, host_url)
 end
 
 
-function request_collection_html(collectionId, collection::DGGSPyramid, host)
+function request_collection_html(collectionId, collection::Collection, host)
     tmpl = joinpath(pkgdir(DGGSexplorer), "src", "html_templates", "collection.html") |> Template
     d = request_collection_json(collectionId, collection)
     d[:collection] = collection
@@ -62,22 +62,23 @@ function request_collection_html(collectionId, collection::DGGSPyramid, host)
     tmpl(init=d)
 end
 
-function request_collection_json(collectionId, collection::DGGSPyramid)
+function request_collection_json(collectionId, collection::Collection)
+    dggs_pyramid = collection.dggs_pyramid
     return Dict(
         :id => collectionId,
         :url => "",
-        :layers => collection |> first |> keys,
-        :metadata => [(key=k, val=String(v)) for (k, v) in pairs(collection.metadata)],
-        :size => join(collection |> last |> size, " x "),
-        :geo_bbox => collection.bbox,
-        :map_layer => intersect(collection |> first |> keys, (:Red, :Green, :Blue)) |> length == 3 ? ("Red,Green,Blue") : collection |> first |> keys |> first |> String
+        :layers => dggs_pyramid |> first |> keys,
+        :metadata => [(key=k, val=String(v)) for (k, v) in pairs(dggs_pyramid.metadata)],
+        :size => join(dggs_pyramid |> last |> size, " x "),
+        :geo_bbox => dggs_pyramid.bbox,
+        :map_layer => intersect(dggs_pyramid |> first |> keys, (:Red, :Green, :Blue)) |> length == 3 ? ("Red,Green,Blue") : dggs_pyramid |> first |> keys |> first |> String
     )
 end
 
 function request_collection_zarr(req, collectionId, collections)
     # TODO: extract base path
     # TODO: throw error if not zarr
-    dggs_p = collections[collectionId]
+    dggs_p = collections[collectionId].dggs_pyramid
     dggs_a = dggs_p |> first |> x -> x.data |> values |> first
 
     pyramid_dir = try
@@ -105,10 +106,11 @@ Serve a collection of DGGSPyramids.
 Caching individual DGGSArrays is highly recommended.
 """
 function serve(
-    collections::Dict{String,DS};
+    collections_vec::Vector{Collection};
     host_url::String="http://127.0.0.1:8080",
     kwargs...
-) where {DS<:DGGSPyramid}
+)
+    collections = Dict(c.id => c for c in collections_vec)
     @get "/" req -> request_root(collections)
     @get "/collections" req -> request_collections(req, collections)
     @get "/collections/{collectionId}" (req, collectionId) -> request_collection(req, collectionId, collections, host_url)

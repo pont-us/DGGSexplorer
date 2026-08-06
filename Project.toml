@@ -23,7 +23,7 @@ YAXArrays = "c21b50f5-aa40-41ea-b809-c0f5e47bfa5c"
 [compat]
 ColorSchemes = "3.29.0"
 ColorTypes = "0.12.1"
-DimensionalData = "0.29.16"
+DimensionalData = "0.30"
 Extents = "0.1.6"
 FileIO = "1.17.0"
 GeometryBasics = "0.5.10"

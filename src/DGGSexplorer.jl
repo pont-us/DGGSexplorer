@@ -20,5 +20,5 @@ DGGSMakie = Base.get_extension(DGGS, :DGGSMakie)
 include("plot.jl")
 include("webserver.jl")
 
-export serve
+export serve, Collection
 end

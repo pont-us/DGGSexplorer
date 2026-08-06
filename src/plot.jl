@@ -31,19 +31,17 @@ function to_image(dggs_array::DGGSArray, lon_dim, lat_dim)
     return img
 end
 
-function to_image(dggs_ds::DGGSDataset, lon_dim, lat_dim)
+struct Collection
+    id::String
+    dggs_pyramid::DGGSPyramid
+    transform::Function
+end
+
+function to_image(dggs_ds::DGGSDataset, lon_dim, lat_dim, transform::Function)
     geo_ds = to_geo_dataset(dggs_ds, lon_dim, lat_dim)
     img = Matrix{RGBA{Float16}}(undef, length(lon_dim), length(lat_dim))
     for i in CartesianIndices(img)
-        r = geo_ds.Red[i] / 255
-        g = geo_ds.Green[i] / 255
-        b = geo_ds.Blue[i] / 255
-
-        img[i] = if ismissing(r) || ismissing(g) || ismissing(b) || isnan(r) || isnan(g) || isnan(b)
-            RGBA(0, 0, 0, 0)
-        else
-            RGBA(r, g, b, 1)
-        end
+        img[i] = transform(geo_ds, i)
     end
     img = img[1:length(lon_dim), length(lat_dim):-1:1]'
     return img
@@ -83,40 +81,25 @@ function request_tile(req, collectionId, collections, z, x, y)
 end
 
 function request_collection_map(req, collectionId, collections; lon_dim=nothing, lat_dim=nothing)
+    collection = collections[collectionId]
+    dggs_pyramid = collection.dggs_pyramid
+
     if isnothing(lon_dim) || isnothing(lat_dim)
-        geo_bbox = collections[collectionId].bbox
+        geo_bbox = dggs_pyramid.bbox
         aspect_ratio = (geo_bbox.X[2] - geo_bbox.X[1]) / (geo_bbox.Y[2] - geo_bbox.Y[1])
         height = 400
         lon_dim = X(range(geo_bbox.X..., length=aspect_ratio * height |> round |> Int))
         lat_dim = Y(range(geo_bbox.Y..., length=height))
     end
 
-    resolution = DGGSMakie.get_resolution(collections[collectionId], lon_dim, lat_dim)
-    dggs_ds = collections[collectionId][resolution]
+    resolution = DGGSMakie.get_resolution(dggs_pyramid, lon_dim, lat_dim)
+    dggs_ds = dggs_pyramid[resolution]
 
-    subset = get(queryparams(req), "subset", "")
-    if occursin("Layer(", subset)
-        layer = match(r"Layer[(][^)]+[)]"ism, subset).match[7:end-1]
-    else
-        if intersect(keys(dggs_ds), (:Red, :Green, :Blue)) |> length == 3
-            layer = "Red,Green,Blue"
-        else
-            layer = keys(dggs_ds)[1] |> String
-        end
-    end
-
-    if !has_overlap(dggs_ds, lon_dim, lat_dim)
+    if !has_overlap(dggs_pyramid, lon_dim, lat_dim)
         return HTTP.Response(404, "Requested area outside of bbox")
     end
 
-    if layer == "Red,Green,Blue"
-        # filter not required bands
-        dggs_ds = DGGSDataset(dggs_ds.Red, dggs_ds.Green, dggs_ds.Blue)
-        img = to_image(dggs_ds, lon_dim, lat_dim)
-    else
-        dggs_array = getproperty(dggs_ds, Symbol(layer))
-        img = to_image(dggs_array, lon_dim, lat_dim)
-    end
+    img = to_image(dggs_ds, lon_dim, lat_dim, collection.transform)
 
     io = IOBuffer()
     save(FileIO.Stream(format"PNG", io), img)
