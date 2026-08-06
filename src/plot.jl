@@ -39,10 +39,7 @@ end
 
 function to_image(dggs_ds::DGGSDataset, lon_dim, lat_dim, transform::Function)
     geo_ds = to_geo_dataset(dggs_ds, lon_dim, lat_dim)
-    img = Matrix{RGBA{Float16}}(undef, length(lon_dim), length(lat_dim))
-    for i in CartesianIndices(img)
-        img[i] = transform(geo_ds, i)
-    end
+    img = transform(geo_ds)
     img = img[1:length(lon_dim), length(lat_dim):-1:1]'
     return img
 end
