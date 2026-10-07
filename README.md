@@ -3,7 +3,7 @@
 [![Build Status](https://github.com/danlooo/DGGSExplorer.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/danlooo/DGGSExplorer.jl/actions/workflows/CI.yml?query=branch%3Amain)
 
 DGGSexplorer is a web server creeating OGC tiles on the fly from DGGS native raster data cubes.
-This project is based on teh Julia library [DGGS.jl](https://github.com/danlooo/DGGS.jl)
+This project is based on the Julia library [DGGS.jl](https://github.com/danlooo/DGGS.jl)
 
 ## Demo
 
